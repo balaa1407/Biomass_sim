@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chemosynth Lab Simulator</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Arial', sans-serif;
+            padding: 20px;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #343a40;
+        }
+        .simulation-form {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        label {
+            font-weight: bold;
+        }
+        button {
+            background-color: #007bff;
+            color: #ffffff;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        canvas {
+            margin: auto;
+            display: block;
+        }
+        .chart-container {
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chemosynth Lab Simulator</h1>
+        <div class="simulation-form">
+            <h2>Input Parameters</h2>
+            <label for="temperature">Temperature (°C):</label>
+            <input type="number" class="form-control" id="temperature" value="25"><br>
+            
+            <label for="h2s">H2S Concentration (mmol/L):</label>
+            <input type="number" class="form-control" id="h2s" value="5"><br>
+            
+            <label for="efficiency">Efficiency (0-1):</label>
+            <input type="number" class="form-control" id="efficiency" step="0.01" value="0.8" min="0" max="1"><br>
+            
+            <button id="runSimulation" class="btn btn-primary btn-block">Run Simulation</button>
+        </div>
+
+        <h2>Graphs</h2>
+        <div class="chart-container">
+            <canvas id="bpChart" width="400" height="200"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="eoChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('runSimulation').addEventListener('click', async () => {
+            const h2sConcentration = parseFloat(document.getElementById('h2s').value);
+            const efficiency = parseFloat(document.getElementById('efficiency').value);
+
+            // Generate a range of temperatures from 10 to 100
+            const temperatures = Array.from({ length: 91 }, (_, i) => i + 10); // 10°C to 100°C
+            const pressures = Array.from({ length: 5 }, (_, i) => i * 10 + 30); // 30 atm to 70 atm
+
+            const biomassProductions = [];
+            const energyOutputs = [];
+
+            // Calculate BP and EO for increasing temperatures
+            for (const temperature of temperatures) {
+                const deltaG = -798.2 + 0.0592 * temperature - 0.0063 * 50; // Fixed pressure at 50 atm
+                const bp = (-deltaG * 0.3) / 0.1; // Biomass production
+                const eo = bp * 20; // Energy output
+
+                biomassProductions.push(bp);
+                energyOutputs.push(eo);
+            }
+
+            // Calculate BP and EO for increasing pressures
+            const energyOutputsPressure = [];
+            for (const pressure of pressures) {
+                const deltaGPressure = -798.2 + 0.0592 * 25 - 0.0063 * pressure; // Fixed temperature at 25°C
+                const bpPressure = (-deltaGPressure * 0.3) / 0.1; // Biomass production
+                const eoPressure = bpPressure * 20; // Energy output
+
+                energyOutputsPressure.push(eoPressure);
+            }
+
+            // Open a new window to display the results
+            const resultWindow = window.open("", "Simulation Results", "width=400,height=300");
+            resultWindow.document.write(`
+                <html>
+                <head>
+                    <title>Simulation Results</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        h2 { color: #343a40; }
+                        p { font-size: 16px; }
+                    </style>
+                </head>
+                <body>
+                    <h2>Simulation Results</h2>
+                    <p>Biomass Production (BP): ${biomassProductions[0]} - ${biomassProductions[biomassProductions.length - 1]} g/m²/day</p>
+                    <p>Energy Output (EO): ${energyOutputs[0]} - ${energyOutputs[energyOutputs.length - 1]} J/m²/day</p>
+                </body>
+                </html>
+            `);
+            resultWindow.document.close(); // Close the document to finish loading
+          
+            // Update the graphs
+            updateGraphs(temperatures, biomassProductions, pressures, energyOutputsPressure);
+        });
+
+        function updateGraphs(temperatures, biomassProductions, pressures, energyOutputs) {
+            const bpCtx = document.getElementById('bpChart').getContext('2d');
+            const eoCtx = document.getElementById('eoChart').getContext('2d');
+
+            // Clear previous charts
+            bpCtx.clearRect(0, 0, bpCtx.canvas.width, bpCtx.canvas.height);
+            eoCtx.clearRect(0, 0, eoCtx.canvas.width, eoCtx.canvas.height);
+
+            // Data for the BP vs. Temperature Chart
+            const bpData = {
+                labels: temperatures, // X-axis (Temperature)
+                datasets: [{
+                    label: 'Biomass Production (g/m²/day)',
+                    data: biomassProductions, // Y-axis (Biomass Production)
+                    borderColor: 'blue',
+                    backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                    fill: true
+                }]
+            };
+
+            // Data for the EO vs. Pressure Chart
+            const eoData = {
+                labels: pressures, // X-axis (Pressure)
+                datasets: [{
+                    label: 'Energy Output (J/m²/day)',
+                    data: energyOutputs, // Y-axis (Energy Output)
+                    borderColor: 'green',
+                    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                    fill: true
+                }]
+            };
+
+            // BP vs. Temperature Chart
+            new Chart(bpCtx, {
+                type: 'line',
+                data: bpData,
+                options: {
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Temperature (°C)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Biomass Production (g/m²/day)'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // EO vs. Pressure Chart
+            new Chart(eoCtx, {
+                type: 'line',
+                data: eoData,
+                options: {
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Pressure (atm)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Energy Output (J/m²/day)'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
